@@ -1,7 +1,7 @@
 diff -up antlr-maven-plugin/pom.xml.BAD antlr-maven-plugin/pom.xml
---- antlr-maven-plugin/pom.xml.BAD	2010-10-12 12:32:35.534549053 -0400
-+++ antlr-maven-plugin/pom.xml	2010-10-12 12:32:44.522548993 -0400
-@@ -151,7 +151,7 @@
+--- antlr-maven-plugin/pom.xml.BAD	2011-03-07 13:18:45.219217017 -0500
++++ antlr-maven-plugin/pom.xml	2011-03-07 13:18:57.498217062 -0500
+@@ -132,7 +132,7 @@
          </executions>
          <configuration>
            <version>1.0.0</version>
@@ -9,4 +9,4 @@ diff -up antlr-maven-plugin/pom.xml.BAD antlr-maven-plugin/pom.xml
 +          <models><model>src/main/mdo/antlrOptions.mdo</model></models>
          </configuration>
        </plugin>
-       <plugin>
+     </plugins>

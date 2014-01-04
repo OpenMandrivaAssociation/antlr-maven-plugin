@@ -1,118 +1,136 @@
-%global svndate		20101012
-%global	svnver		12849
-%global svnstring	%{svndate}svn%{svnver}
-
+%{?_javapackages_macros:%_javapackages_macros}
 Name:			antlr-maven-plugin
-Version:		2.1
-Release:		4.%{svnstring}
+Version:		2.2
+Release:		12.0%{?dist}
 Summary:		Maven plugin that generates files based on grammar file(s)
 License:		ASL 2.0
 URL:			http://mojo.codehaus.org/antlr-maven-plugin/
-Group:			Development/Java
-# No source tarball known.
-# Checked out from SVN
-# svn export https://svn.codehaus.org/mojo/tags/antlr-maven-plugin-2.1 antlr-maven-plugin
-# tar cfj antlr-maven-plugin-20101012svn12849.tar.bz2 antlr-maven-plugin
-Source0:		%{name}-%{svnstring}.tar.bz2
-# Modern modello expects to see <models></models>, even if there is only one. 
-Patch0:			maven-antlr-plugin-2.1-modello-issue.patch
-# Add maven-artifact to the pom.xml, we need it to build
-Patch1:			maven-antlr-plugin-2.1-artifact.patch
+
+
+Source0:		http://repo1.maven.org/maven2/org/codehaus/mojo/%{name}/%{version}/%{name}-%{version}-source-release.zip
+
+# Modern modello expects to see <models></models>, even if there is only one.
+Patch0:			maven-antlr-plugin-2.2-modello-issue.patch
 # siteRenderer.createSink doesn't exist anymore
 Patch2:			maven-antlr-plugin-2.1-sinkfix.patch
-BuildRoot:		%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+# Fix grammar processing bug (bz 1020312)
+Patch3:			0001-MANTLR-34-Fix-NPE-when-building-Jenkins.patch
+
 BuildArch:		noarch
+
 BuildRequires:		java-devel
 BuildRequires:		jpackage-utils
 BuildRequires:		antlr
-BuildRequires:		maven2
-BuildRequires:		maven2-plugin-compiler
-BuildRequires:		maven2-plugin-install
-BuildRequires:		maven2-plugin-jar
-BuildRequires:		maven2-plugin-javadoc
-BuildRequires:		maven2-plugin-resources
-BuildRequires:		maven2-plugin-surefire
-BuildRequires:		maven-antrun-plugin
-BuildRequires:		maven-clean-plugin
-BuildRequires:		maven-invoker-plugin
-BuildRequires:		maven-plugin-plugin
-BuildRequires:		maven-release-plugin
-BuildRequires:		maven-site-plugin
-BuildRequires:		maven-source-plugin
+BuildRequires:		maven-local
 BuildRequires:		maven-plugin-bundle
-Requires:		antlr
-Requires:		jpackage-utils
-Requires:		java >= 0:1.6.0
-Requires(post):		jpackage-utils
-Requires(postun):	jpackage-utils
+BuildRequires:		maven-plugin-cobertura
+BuildRequires:		apache-commons-exec
+BuildRequires:		modello
+
 Provides:		maven2-plugin-antlr = %{version}-%{release}
 Obsoletes:		maven2-plugin-antlr <= 2.0.8
 
 %description
 The Antlr Plugin has two goals:
-- antlr:generate Generates file(s) to a target directory based on grammar 
+- antlr:generate Generates file(s) to a target directory based on grammar
   file(s).
 - antlr:html Generates Antlr report for grammar file(s).
 
 %package javadoc
 Summary:		Javadocs for %{name}
-Group:			Development/Java
-Requires:		jpackage-utils
+
 
 %description javadoc
 This package contains the API documentation for %{name}.
 
 %prep
-%setup -q -n %{name}
+%setup -q
 %patch0 -p1 -b .modello
-%patch1 -p1 -b .artifact
 %patch2 -p1 -b .sink
+%patch3 -p1 -b .fixnpe
+
+# reporting eventually pulls in another antlr and we'd break with weird errors
+%pom_xpath_inject "pom:dependency[pom:artifactId[text()='maven-reporting-impl']]/pom:exclusions" "
+        <exclusion>
+            <groupId>antlr</groupId>
+            <artifactId>antlr</artifactId>
+        </exclusion>"
 
 # remove all binary bits
 find -name '*.class' -exec rm -f '{}' \;
 find -name '*.jar' -exec rm -f '{}' \;
 
-%build
-export MAVEN_REPO_LOCAL=$(pwd)/.m2/repository
-mkdir -p $MAVEN_REPO_LOCAL
+%mvn_file : %{name}
 
-# Tests seem unhappy, skipping them.
-mvn-jpp -Dmaven.test.skip=true \
--Dmaven.repo.local=$MAVEN_REPO_LOCAL \
-install javadoc:javadoc
+%build
+%mvn_build -- -Dmaven.test.skip=true
 
 %install
-rm -rf %{buildroot}
-mkdir -p %{buildroot}%{_javadir}
+%mvn_install
 
-cp -p target/%{name}-%{version}.jar %{buildroot}%{_javadir}/%{name}-%{version}.jar
-pushd %{buildroot}%{_javadir}
-ln -s %{name}-%{version}.jar %{name}.jar
-popd
+%files -f .mfiles
 
-mkdir -p %{buildroot}%{_javadocdir}/%{name}
-cp -rp target/site/apidocs/ %{buildroot}%{_javadocdir}/%{name}
+%files javadoc -f .mfiles-javadoc
 
-install -d -m 755 %{buildroot}%{_mavenpomdir}
-%add_to_maven_depmap org.codehaus.mojo %{name} %{version} JPP %{name}
-install -pm 644 pom.xml %{buildroot}%{_mavenpomdir}/JPP-%{name}.pom
+%changelog
+* Fri Oct 18 2013 Tom Callaway <spot@fedoraproject.org> - 2.2-12
+- Fix grammar processing bug (bz 1020312)
+  Thanks to Michal Srb
 
-%clean
-rm -rf %{buildroot}
+* Sat Aug 24 2013 Mat Booth <fedora@matbooth.co.uk> - 2.2-11
+- Remove unneeded BR on maven2-common-poms
+- Update for newer guidelines
 
-%post
-%update_maven_depmap
+* Sat Aug 03 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.2-10
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_20_Mass_Rebuild
 
-%postun
-%update_maven_depmap
+* Mon Mar 04 2013 Stanislav Ochotnicky <sochotnicky@redhat.com> - 2.2-9
+- Add dependency exclusion for antlr (#911054)
 
-%files
-%defattr(-,root,root,-)
-%{_mavenpomdir}/*
-%{_mavendepmapfragdir}/*
-%{_javadir}/%{name}*.jar
+* Wed Feb 13 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.2-8
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_19_Mass_Rebuild
 
-%files javadoc
-%defattr(-,root,root,-)
-%{_javadocdir}/%{name}
+* Wed Feb 06 2013 Java SIG <java-devel@lists.fedoraproject.org> - 2.2-7
+- Update for https://fedoraproject.org/wiki/Fedora_19_Maven_Rebuild
+- Replace maven BuildRequires with maven-local
 
+* Wed Jul 18 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.2-6
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
+
+* Thu Jan 12 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.2-5
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_17_Mass_Rebuild
+
+* Mon Dec 05 2011 Tomas Radej <tradej@redhat.com> - 2.2-4
+- Modello + maven-enforcer-plugin BR
+- Guideline fixes
+
+* Thu Apr 28 2011 Stanislav Ochotnicky <sochotnicky@redhat.com> - 2.2-3
+- Add apache-commons-exec to R
+
+* Wed Mar 9 2011 Alexander Kurtakov <akurtako@redhat.com> 2.2-2
+- Build with maven 3.
+- Use upstream sources.
+- Adapt to current guidelines.
+
+* Thu Mar  3 2011 Tom Callaway <spot@fedoraproject.org> 2.2-1.20110307svn13719
+- update to 2.2 tag
+
+* Mon Feb 07 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 2.1-4.20101012svn12849
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
+
+* Wed Oct 13 2010 Tom "spot" Callaway <tcallawa@redhat.com> 2.1-3.20101012svn12849
+- fix provides/obsoletes to replace old (dead) package
+- don't own mavendepmapfragdir, just the files inside it
+- don't set buildarch on javadoc (entire package is noarch already)
+
+* Wed Oct 13 2010 Tom "spot" Callaway <tcallawa@redhat.com> 2.1-2.20101012svn12849
+- add post/postun
+- fix pom filename
+- svn export
+- comment patchset
+- provides for maven-antlr-plugin
+- drop unnecessary symlinks
+- use maven macros
+
+* Tue Oct 12 2010 Tom "spot" Callaway <tcallawa@redhat.com> 2.1-1.20101012svn12849
+- initial package

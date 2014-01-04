@@ -23,7 +23,7 @@ BuildRequires:		jpackage-utils
 BuildRequires:		antlr
 BuildRequires:		maven-local
 BuildRequires:		maven-plugin-bundle
-BuildRequires:		maven-plugin-cobertura
+BuildRequires:		cobertura-maven-plugin
 BuildRequires:		apache-commons-exec
 BuildRequires:		modello
 
